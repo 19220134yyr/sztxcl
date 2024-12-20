@@ -104,63 +104,6 @@ function showHistogram(hObject, eventdata)
 end
 
 
-function enhanceContrast(hObject, eventdata)
-    % 获取当前图形窗口句柄
-    hFig = gcf;
-    
-    % 从GUI句柄中获取图像数据
-    imageData = getappdata(hFig, 'imageData');
-    
-    % 如果没有图像数据，则返回
-    if isempty(imageData)
-        disp('没有图像数据。请先打开一个图像文件。');
-        return;
-    end
-    
-    % 如果图像是彩色的，则转换为灰度图像
-    if size(imageData, 3) == 3
-        grayImg = rgb2gray(imageData);
-    else
-        grayImg = imageData;
-    end
-    
-    % 显示原始灰度图像
-    figure('Name', '原始灰度图像', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
-    imshow(grayImg);
-    title('原始灰度图像');
-    
-    % 线性变换增强对比度
-    c = 1.5; % 对比度增强系数
-    b = 0; % 偏移量
-    linearEnhanced = uint8(c * double(grayImg) + b);
-    figure('Name', '线性变换增强对比度', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
-    imshow(linearEnhanced);
-    title('线性变换增强对比度');
-    
-    % 保存线性变换增强的图像
-    setappdata(hFig, 'linearEnhancedImage', linearEnhanced);
-    
-    % 对数变换增强对比度
-    logEnhanced = uint8(255 * log(1 + double(grayImg)));
-    figure('Name', '对数变换增强对比度', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
-    imshow(logEnhanced);
-    title('对数变换增强对比度');
-    
-    % 保存对数变换增强的图像
-    setappdata(hFig, 'logEnhancedImage', logEnhanced);
-    
-    % 指数变换增强对比度
-    gamma = 0.4; % 指数变换的gamma值
-    expEnhanced = uint8(255 * (double(grayImg) / 255) .^ gamma);
-    figure('Name', '指数变换增强对比度', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
-    imshow(expEnhanced);
-    title(['指数变换增强对比度 (gamma=' num2str(gamma) ')']);
-    
-    % 保存指数变换增强的图像
-    setappdata(hFig, 'expEnhancedImage', expEnhanced);
-end
-
-
 function imageTransform(hObject, eventdata)
     % 获取当前图形窗口句柄
     hFig = gcf;
@@ -285,106 +228,141 @@ function g_rotated = bilinearInterpolationRotate(f, theta)
     end
 end
 
-
-
-
-function noisyImage = addGaussianNoise(image, noiseSigma)
-    noisyImage = double(image) + noiseSigma * randn(size(image));
-    noisyImage = min(max(noisyImage, 0), 255); % 确保像素值在0-255范围内
-end
-
-
-function filteredImage = meanFilter(image, filterSize)
-    [height, width] = size(image);
-    filteredImage = zeros(height, width);
-    padSize = floor(filterSize / 2);
-    paddedImage = padarray(image, [padSize, padSize], 'replicate', 'both');
-    
-    for i = 1:height
-        for j = 1:width
-            window = paddedImage(i:i+2*padSize, j:j+2*padSize);
-            filteredImage(i, j) = mean(window(:));
-        end
-    end
-end
-
-function H = createGaussianFilter(height, width, filterSize, sigma)
-    centerH = ceil(height / 2);
-    centerW = ceil(width / 2);
-    H = zeros(height, width);
-    
-    for u = 1:height
-        for v = 1:width
-            distance = sqrt((u - centerH)^2 + (v - centerW)^2);
-            H(u, v) = exp(-(distance^2) / (2 * sigma^2));
-        end
-    end
-end
-
-function filteredImage = frequencyDomainFilter(image, filterSize, sigma)
-    % 转换图像到频域
-    F = fft2(double(image));
-    F = fftshift(F); % 将零频率分量移到频谱中心
-    
-    % 获取图像尺寸
-    [rows, cols] = size(image);
-    
-    % 创建高斯低通滤波器
-    [x, y] = meshgrid(-floor(cols/2):floor(cols/2)-1, -floor(rows/2):floor(rows/2)-1);
-    H = exp(-(x.^2 + y.^2) / (2 * sigma^2));
-    H = H / sum(H(:)); % 归一化滤波器
-    
-    % 扩展滤波器大小以匹配图像尺寸
-    H = padarray(H, [(rows - filterSize) / 2, (cols - filterSize) / 2], 'both');
-    
-    % 执行频域乘法
-    G = F .* H;
-    
-    % 反变换回空域
-    g = ifftshift(G);
-    filteredImage = ifft2(g);
-    filteredImage = real(filteredImage); % 只取实部
-    filteredImage = min(max(filteredImage, 0), 255); % 确保像素值在0-255范围内
-end
-
-
-function noiseAndFilter(hObject, eventdata)
+function enhanceContrast(hObject, eventdata)
+    % 获取当前图形窗口句柄
     hFig = gcf;
+    
+    % 从GUI句柄中获取图像数据
     imageData = getappdata(hFig, 'imageData');
     
+    % 如果没有图像数据，则返回
     if isempty(imageData)
         disp('没有图像数据。请先打开一个图像文件。');
         return;
     end
     
-    % 设置噪声参数
-    noiseSigma = 20; % 可以根据需要调整噪声强度
+    % 如果图像是彩色的，则转换为灰度图像
+    if size(imageData, 3) == 3
+        grayImg = rgb2gray(imageData);
+    else
+        grayImg = imageData;
+    end
     
-    % 添加高斯噪声
-    noisyImage = addGaussianNoise(imageData, noiseSigma);
+    % 显示原始灰度图像
+    figure('Name', '原始灰度图像', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    imshow(grayImg);
+    title('原始灰度图像');
     
-    % 空域滤波
-    filterSize = 3; % 均值滤波器的大小
-    spatialFiltered = meanFilter(noisyImage, filterSize);
+    % 线性变换增强对比度
+    c = 1.5; % 对比度增强系数
+    b = 0; % 偏移量
+    linearEnhanced = uint8(c * double(grayImg) + b);
+    figure('Name', '线性变换增强对比度', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    imshow(linearEnhanced);
+    title('线性变换增强对比度');
     
-    % 频域滤波
-    filterSize = 15; % 高斯低通滤波器的大小
-    sigma = 5; % 高斯低通滤波器的标准差
-    frequencyFiltered = frequencyDomainFilter(noisyImage, filterSize, sigma);
+    % 保存线性变换增强的图像
+    setappdata(hFig, 'linearEnhancedImage', linearEnhanced);
+        
+    % 对数变换增强对比度
+    base = 0.01; % 基数
+    logEnhanced = uint8(255 * log(1 + base * double(grayImg)));
+    logEnhanced = max(min(logEnhanced, 255), 0); % 裁剪到[0, 255]范围
     
-    % 显示结果
+    figure('Name', '对数变换增强对比度', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    imshow(logEnhanced);
+    title('对数变换增强对比度');
+    
+    % 保存对数变换增强的图像
+    setappdata(hFig, 'logEnhancedImage', logEnhanced);
+
+    
+    % 指数变换增强对比度
+    gamma = 0.4; % 指数变换的gamma值
+    expEnhanced = uint8(255 * (double(grayImg) / 255) .^ gamma);
+    figure('Name', '指数变换增强对比度', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    imshow(expEnhanced);
+    title(['指数变换增强对比度 (gamma=' num2str(gamma) ')']);
+    
+    % 保存指数变换增强的图像
+    setappdata(hFig, 'expEnhancedImage', expEnhanced);
+end
+
+
+
+
+function noiseAndFilter(hObject, eventdata)
+    % 获取当前图形窗口句柄
+    hFig = gcf;
+    
+    % 从GUI句柄中获取图像数据
+    imageData = getappdata(hFig, 'imageData');
+    
+    % 如果是彩色图像，则转换为灰度图像
+    if size(imageData, 3) == 3
+        imageData = rgb2gray(imageData);
+    end
+    
+    % 创建对话框，提示用户输入噪声水平
+    prompt = {'输入噪声水平:'};
+    dlgtitle = 'Input Noise Level';
+    numlines = 1;
+    definput = {'0.2'}; % 默认噪声水平
+    answer = inputdlg(prompt, dlgtitle, numlines, definput);
+    
+    % 检查用户是否输入了值
+    if isempty(answer)
+        disp('没有输入');
+        return;
+    else
+        noiseLevel = str2double(answer{1});
+        if isnan(noiseLevel)
+            disp('无效输入');
+            return;
+        end
+    end
+    
+     % 添加高斯噪声
+    noisyImage = imnoise(imageData, 'gaussian', 0, noiseLevel^2);
+    
+    % 显示噪声图像
     figure;
-    subplot(1, 3, 1);
-    imshow(uint8(noisyImage), []);
-    title('Noisy Image');
+    imshow(noisyImage);
+    title('添加高斯噪声后的图像');
     
-    subplot(1, 3, 2);
-    imshow(uint8(spatialFiltered), []);
-    title('Spatial Filtered Image');
+    % 均值滤波 
+    filterSize = 3; % 滤波器大小
+    meanFilter = ones(filterSize) / (filterSize^2);
+    filteredImageMean = filter2(meanFilter, noisyImage);
+    filteredImageMean = uint8(filteredImageMean);
     
-    subplot(1, 3, 3);
-    imshow(uint8(frequencyFiltered), []);
-    title('Frequency Filtered Image');
+    % 显示均值滤波后的图像
+    figure;
+    imshow(filteredImageMean);
+    title('均值滤波后的图像');
+    
+    % 理想低通滤波 - 调整截止频率D0
+    [M, N] = size(noisyImage);
+    D0 = max(M, N) ; % 截止频率
+    [u, v] = meshgrid(-N/2:N/2-1, -M/2:M/2-1);
+    D = sqrt(u.^2 + v.^2);
+    H_ideal = double(D <= D0);
+    
+    % 频域滤波 - 理想低通
+    F = fft2(double(noisyImage));
+    G_ideal = F .* H_ideal;
+    filteredImageIdeal = ifft2(G_ideal);
+    filteredImageIdeal = real(filteredImageIdeal);
+    
+    % 归一化到[0, 255]并转换为uint8
+    filteredImageIdeal = filteredImageIdeal - min(filteredImageIdeal(:));
+    filteredImageIdeal = filteredImageIdeal / max(filteredImageIdeal(:)) * 255;
+    filteredImageIdeal = uint8(filteredImageIdeal);
+    
+    % 显示理想低通滤波后的图像
+    figure;
+    imshow(filteredImageIdeal);
+    title('理想低通滤波后的图像');
 end
 
 
