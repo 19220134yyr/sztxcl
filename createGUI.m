@@ -394,33 +394,32 @@ function edgeDetection(hObject, eventdata)
     
     % Robert算子
     robertsEdge = edge(grayImage, 'roberts');
-    subplot(2, 2, 1);
+    figure;
     imshow(robertsEdge);
-    title('Robert Edge Detection');
-    axis on;
+    title('Robert算子边缘提取');
+  
     
     % Prewitt算子
     prewittEdge = edge(grayImage, 'prewitt');
-    subplot(2, 2, 2);
+    figure;
     imshow(prewittEdge);
-    title('Prewitt Edge Detection');
-    axis on;
+    title('Prewitt算子边缘提取');
+
     
     % Sobel算子
     sobelEdge = edge(grayImage, 'sobel');
-    subplot(2, 2, 3);
+    figure;
     imshow(sobelEdge);
-    title('Sobel Edge Detection');
-    axis on;
+    title('Sobel算子边缘提取');
+
     
     % 拉普拉斯算子
     laplacianEdge = edge(grayImage, 'log'); % 'log' 使用了拉普拉斯高斯算子
-    subplot(2, 2, 4);
+    figure;
     imshow(laplacianEdge);
-    title('Laplacian Edge Detection');
-    axis on;
-end
+    title('拉普拉斯算子边缘提取');
 
+end
 
 function objectExtraction(hObject, eventdata)
     % 获取当前图形窗口句柄
@@ -451,19 +450,14 @@ function objectExtraction(hObject, eventdata)
     
     % 显示二值图像和标记的连通区域
     figure;
-    subplot(1, 2, 1);
     imshow(binaryImage);
-    title('Binary Image');
-    axis on;
-    
-    subplot(1, 2, 2);
+    title('处理后的二值图像');
+        
+    figure;
     imshow(L);
-    title(['Labeled Objects - ', num2str(numObjects), ' objects found']);
-    axis on;
+    title(['找到了', num2str(numObjects), '个标记的物体']);
+
     
-    % 将标记的连通区域图像存储到GUI句柄的 'targetImage' 属性中
-    setappdata(hFig, 'targetImage', L);
-    disp('目标图像提取并存储成功。');
 end
 
 
@@ -473,111 +467,48 @@ function featureExtraction(hObject, eventdata)
     
     % 从GUI句柄中获取图像数据
     imageData = getappdata(hFig, 'imageData');
-    targetImage = getappdata(hFig, 'targetImage');
     
     % 如果没有图像数据，则返回
-    if isempty(imageData) || isempty(targetImage)
-        disp('没有图像数据或目标图像。请先打开一个图像文件并提取目标。');
-        return;
+    if isempty(imageData) 
+        disp('没有图像数据。请先打开一个图像文件。');
+       return;
     end
     
-    % 提取原始图像的LBP特征
-    [lbpFeaturesOrig, lbpImageOrig] = extractLBP(imageData);
-    disp('原始图像的LBP特征提取完成。');
-    
-    % 提取原始图像的HOG特征
-    hogFeaturesOrig = extractHOG(imageData);
-    disp('原始图像的HOG特征提取完成。');
-    
-    % 提取目标图像的LBP特征
-    [lbpFeaturesTarget, lbpImageTarget] = extractLBP(targetImage);
-    disp('目标图像的LBP特征提取完成。');
-    
-    % 提取目标图像的HOG特征
-    hogFeaturesTarget = extractHOG(targetImage);
-    disp('目标图像的HOG特征提取完成。');
-    
-    % 可以在这里添加代码来显示特征或进行进一步处理
-end
-
-function [lbpFeatures, lbpImage] = extractLBP(image)
-    P = 8; % 假设使用8邻域LBP
-    R = 1; % 圆形邻域半径
-    lbpFeatures = zeros(1, P + 2); % 初始化LBP特征数组，大小为P + 2
-    lbpImage = zeros(size(image)); % 初始化LBP图像
-    
-    [rows, cols] = size(image);
-    
-    for i = 1:rows
-        for j = 1:cols
-            % 提取中心像素周围的像素值
-            centerPixel = image(i, j);
-            pixelValues = zeros(1, P);
-            for k = 0:P-1
-                theta = k * 2 * pi / P;
-                x = round(i + R * cos(theta));
-                y = round(j + R * sin(theta));
-                % 确保索引在图像范围内
-                x = max(1, min(x, rows));
-                y = max(1, min(y, cols));
-                pixelValues(k + 1) = image(x, y);
-            end
-            % 计算LBP值
-            lbpValue = 0;
-            for k = 1:P
-                lbpValue = lbpValue + (pixelValues(k) >= centerPixel) * 2^(k-1);
-            end
-            % 确保lbpValue在特征数组大小范围内
-            if lbpValue < length(lbpFeatures)
-                lbpFeatures(lbpValue + 1) = lbpFeatures(lbpValue + 1) + 1;
-            end
-            lbpImage(i, j) = lbpValue;
-        end
+    % 检查图像是否为灰度图像，如果不是则转换为灰度图像
+    if size(imageData, 3) == 3
+        grayImageData = rgb2gray(imageData);
+    else
+        grayImageData = imageData;
     end
-end
 
-function hogFeatures = extractHOG(image)
-    % 简单的HOG特征提取
-    % 这个实现非常基础，仅用于示例
-    % 实际应用中应使用更完善的实现
-    [rows, cols] = size(image);
-    cellSize = [8 8]; % 每个单元的大小
-    blockSize = [16 16]; % 块的大小
-    bins = 9; % 直方图箱数
-    
-    % 计算图像的梯度
-    Gx = [-1 0 1; -2 0 2; -1 0 1];
-    Gy = [1 2 1; 0 0 0; -1 -2 -1];
-    Ix = conv2(double(image), Gx, 'same');
-    Iy = conv2(double(image), Gy, 'same');
-    
-    % 计算梯度的幅度和方向
-    gradientMag = sqrt(Ix.^2 + Iy.^2);
-    gradientAngle = atan2(Iy, Ix) * (180/pi); % 转换为度
-    
-    % 直方图规范化
-    hogFeatures = zeros(1, (rows/blockSize(1)-1) * (cols/blockSize(2)-1) * bins);
-    idx = 1;
-    for i = 1:blockSize(1):rows-cellSize(1)
-        for j = 1:blockSize(2):cols-cellSize(2)
-            blockMag = gradientMag(i:i+cellSize(1)-1, j:j+cellSize(2)-1);
-            blockAngle = gradientAngle(i:i+cellSize(1)-1, j:j+cellSize(2)-1);
-            hist = zeros(1, bins);
-            for m = 1:cellSize(1)
-                for n = 1:cellSize(2)
-                    angle = blockAngle(m, n);
-                    mag = blockMag(m, n);
-                    bin = floor((angle + 180) / 360 * bins);
-                    if bin == bins
-                        bin = 0;
+    calculateLBP(grayImageData);
+    calculateLBP
+
+    %LBP特征提取
+    function lbpImage = calculateLBP(grayImage)
+        [N,M]=size(grayImage);
+        lbp=zeros(N,M);
+        for j=2:N-1
+            for i=2:M-1
+                neighbor=[j-1 i-1;j-1 i;j-1 i+1;j i+1;j+1 i+1;j+1 i;j+1 i-1;j i-1];
+                count=0;
+                for k=1:8
+                    if grayImageData(neighbor(k,1),neighbor(k,2))>grayImage(j,i)
+                        count=count+2^(8-k);
                     end
-                    hist(bin+1) = hist(bin+1) + mag;
                 end
+                lbp(j,i)=count;
             end
-            hogFeatures(idx:idx+bins-1) = hist;
-            idx = idx + bins;
         end
+        lbp=uint8(lbp);
+        figure,imshow(lbp),title('LBP特征图');
+        subim=lbp(1:8,1:8);
+        figure,imhist(subim),title('第一个8*8子区域的LBP直方图');
+        end
+
+    %HOG特征提取
+    function hogImage = calculateHOG(grayImage)
+        
     end
+
 end
-
-
