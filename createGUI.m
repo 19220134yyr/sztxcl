@@ -281,8 +281,10 @@ function enhanceContrast(hObject, eventdata)
         grayImg = imageData;
     end
     
+    figure('Name', '对比度增强', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    
     % 显示原始灰度图像
-    figure('Name', '原始灰度图像', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    subplot(2, 2, 1);
     imshow(grayImg);
     title('原始灰度图像');
     
@@ -290,7 +292,7 @@ function enhanceContrast(hObject, eventdata)
     c = 1.5; % 对比度增强系数
     b = 0; % 偏移量
     linearEnhanced = uint8(c * double(grayImg) + b);
-    figure('Name', '线性变换增强对比度', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    subplot(2, 2, 2);
     imshow(linearEnhanced);
     title('线性变换增强对比度');
     
@@ -301,19 +303,17 @@ function enhanceContrast(hObject, eventdata)
     base = 0.01; % 基数
     logEnhanced = uint8(255 * log(1 + base * double(grayImg)));
     logEnhanced = max(min(logEnhanced, 255), 0); % 裁剪到[0, 255]范围
-    
-    figure('Name', '对数变换增强对比度', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    subplot(2, 2, 3);
     imshow(logEnhanced);
     title('对数变换增强对比度');
     
     % 保存对数变换增强的图像
     setappdata(hFig, 'logEnhancedImage', logEnhanced);
 
-    
     % 指数变换增强对比度
     gamma = 0.4; % 指数变换的gamma值
     expEnhanced = uint8(255 * (double(grayImg) / 255) .^ gamma);
-    figure('Name', '指数变换增强对比度', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    subplot(2, 2, 4);
     imshow(expEnhanced);
     title(['指数变换增强对比度 (gamma=' num2str(gamma) ')']);
     
@@ -380,8 +380,6 @@ function noiseAndFilter(hObject, eventdata)
     [u, v] = meshgrid(-N/2:N/2-1, -M/2:M/2-1);
     D = sqrt(u.^2 + v.^2);
     H_ideal = double(D <= D0);
-    
-    % 频域滤波 - 理想低通
     F = fft2(double(noisyImage));
     G_ideal = F .* H_ideal;
     filteredImageIdeal = ifft2(G_ideal);
@@ -487,8 +485,7 @@ function objectExtraction(hObject, eventdata)
     figure;
     imshow(L);
     title(['找到了', num2str(numObjects), '个标记的物体']);
-
-    
+  
 end
 
 
