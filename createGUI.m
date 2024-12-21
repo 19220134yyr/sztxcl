@@ -124,16 +124,29 @@ function imageTransform(hObject, eventdata)
         grayImage = imageData;
     end
     
-    % 放大系数
-    kx = input('请输入水平放大系数：');
-    ky = input('请输入垂直放大系数：');
+    % 创建输入对话框
+    prompt = {'请输入水平缩小系数：', '请输入垂直缩小系数：', '请输入旋转角度（度数）：'};
+    dlgtitle = '输入图像变换参数';
+    numlines = 1;
+    definput = {'0.66', '0.77', '45'}; % 默认输入值
+    answer = inputdlg(prompt, dlgtitle, numlines, definput);
     
-    % 放大图像
+    % 检查用户是否点击了取消或关闭对话框
+    if isempty(answer)
+        disp('用户取消了输入。');
+        return;
+    end
+    
+    % 获取输入值
+    kx = str2double(answer{1});
+    ky = str2double(answer{2});
+    theta = str2double(answer{3});
+    
+    % 缩小图像
     g_scaled = bilinearInterpolationScale(grayImage, kx, ky);
     
-    % 旋转角度（逆时针）
-    theta = input('请输入旋转角度（度数）：');
-    theta = -theta * pi / 180; % 将角度转换为弧度
+    % 将角度转换为弧度
+    theta = -theta * pi / 180;
     
     % 旋转图像
     g_rotated = bilinearInterpolationRotate(g_scaled, theta);
@@ -143,17 +156,24 @@ function imageTransform(hObject, eventdata)
     setappdata(hFig, 'rotatedImageData', g_rotated);
     
     % 显示变换后的图像
-    figure('Name', '放大和旋转后的图像', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    figure('Name', '缩小后的图像', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    imshow(g_scaled);
+    title('缩小后的图像');
+    
+    figure('Name', '缩小和旋转后的图像', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
     imshow(g_rotated);
-    title('放大和旋转后的图像');
+    title('缩小和旋转后的图像');
 end
 
 function g_scaled = bilinearInterpolationScale(f, kx, ky)
-    % 双线性插值放大图像
+    % 双线性插值缩小图像
     [height, width] = size(f);
-    newHeight = round(ky * height);
-    newWidth = round(kx * width);
-    g_scaled = zeros(newHeight, newWidth);
+    newHeight = floor(ky * height); % 使用floor确保新尺寸是原始尺寸的整数倍
+    newWidth = floor(kx * width);
+    g_scaled = uint8(zeros(newHeight, newWidth)); % 输出图像初始化为uint8
+    
+    % 将输入图像转换为double类型
+    f_double = double(f);
     
     for i = 1:newHeight
         for j = 1:newWidth
@@ -163,16 +183,24 @@ function g_scaled = bilinearInterpolationScale(f, kx, ky)
             x2 = ceil(x);
             y1 = floor(y);
             y2 = ceil(y);
+            
+            % 确保x1, x2, y1, y2在图像尺寸范围内
             x1 = max(1, min(x1, width));
             x2 = max(1, min(x2, width));
             y1 = max(1, min(y1, height));
             y2 = max(1, min(y2, height));
-            r1 = f(y1, x1) * (x2 - x) + f(y1, x2) * (x - x1);
-            r2 = f(y2, x1) * (x2 - x) + f(y2, x2) * (x - x1);
-            g_scaled(i, j) = r1 * (y2 - y) + r2 * (y - y1);
+            
+            % 计算权重
+            r1 = f_double(y1, x1) * (x2 - x) + f_double(y1, x2) * (x - x1);
+            r2 = f_double(y2, x1) * (x2 - x) + f_double(y2, x2) * (x - x1);
+            
+            % 应用权重
+            g_scaled(i, j) = uint8(r1 * (y2 - y) + r2 * (y - y1));
         end
     end
 end
+
+
 
 function g_rotated = bilinearInterpolationRotate(f, theta)
     % 双线性插值旋转图像
@@ -194,10 +222,13 @@ function g_rotated = bilinearInterpolationRotate(f, theta)
     % 计算新图像的大小
     newWidth = round(max_x - min_x) + 1;
     newHeight = round(max_y - min_y) + 1;
-    g_rotated = zeros(newHeight, newWidth);
+    g_rotated = uint8(zeros(newHeight, newWidth)); % 初始化为uint8类型
     
     % 旋转矩阵的逆
     t_inv = [cos_theta, sin_theta; -sin_theta, cos_theta];
+    
+    % 将输入图像转换为double类型
+    f_double = double(f);
     
     for i = 1:newHeight
         for j = 1:newWidth
@@ -218,15 +249,17 @@ function g_rotated = bilinearInterpolationRotate(f, theta)
             
             % 进行双线性插值
             if x1 == x2 && y1 == y2
-                g_rotated(i, j) = f(y1, x1);
+                g_rotated(i, j) = f_double(y1, x1);
             else
-                r1 = f(y1, x1) * (x2 - x(1)) + f(y1, x2) * (x(1) - x1);
-                r2 = f(y2, x1) * (x2 - x(1)) + f(y2, x2) * (x(1) - x1);
-                g_rotated(i, j) = r1 * (y2 - x(2)) + r2 * (x(2) - y1);
+                r1 = f_double(y1, x1) * (x2 - x(1)) + f_double(y1, x2) * (x(1) - x1);
+                r2 = f_double(y2, x1) * (x2 - x(1)) + f_double(y2, x2) * (x(1) - x1);
+                g_rotated(i, j) = uint8(r1 * (y2 - x(2)) + r2 * (x(2) - y1));
             end
         end
     end
 end
+
+
 
 function enhanceContrast(hObject, eventdata)
     % 获取当前图形窗口句柄
@@ -326,7 +359,7 @@ function noiseAndFilter(hObject, eventdata)
     noisyImage = imnoise(imageData, 'gaussian', 0, noiseLevel^2);
     
     % 显示噪声图像
-    figure;
+    figure('Name', '添加高斯噪声', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
     imshow(noisyImage);
     title('添加高斯噪声后的图像');
     
@@ -337,11 +370,11 @@ function noiseAndFilter(hObject, eventdata)
     filteredImageMean = uint8(filteredImageMean);
     
     % 显示均值滤波后的图像
-    figure;
+    figure('Name', '空域-均值滤波', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
     imshow(filteredImageMean);
     title('均值滤波后的图像');
     
-    % 理想低通滤波 - 调整截止频率D0
+    % 理想低通滤波
     [M, N] = size(noisyImage);
     D0 = max(M, N) ; % 截止频率
     [u, v] = meshgrid(-N/2:N/2-1, -M/2:M/2-1);
@@ -360,7 +393,7 @@ function noiseAndFilter(hObject, eventdata)
     filteredImageIdeal = uint8(filteredImageIdeal);
     
     % 显示理想低通滤波后的图像
-    figure;
+    figure('Name', '频域-理想低通滤波', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
     imshow(filteredImageIdeal);
     title('理想低通滤波后的图像');
 end
@@ -389,37 +422,35 @@ function edgeDetection(hObject, eventdata)
         grayImage = imageData;
     end
     
-    % 初始化图形窗口
-    figure('Name', 'Edge Detection', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    % 创建窗口
+    figure('Name', '边缘检测', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
     
     % Robert算子
+    subplot(2, 2, 1); 
     robertsEdge = edge(grayImage, 'roberts');
-    figure;
     imshow(robertsEdge);
     title('Robert算子边缘提取');
-  
     
     % Prewitt算子
+    subplot(2, 2, 2); 
     prewittEdge = edge(grayImage, 'prewitt');
-    figure;
     imshow(prewittEdge);
     title('Prewitt算子边缘提取');
-
     
     % Sobel算子
+    subplot(2, 2, 3); 
     sobelEdge = edge(grayImage, 'sobel');
-    figure;
     imshow(sobelEdge);
     title('Sobel算子边缘提取');
-
     
     % 拉普拉斯算子
+    subplot(2, 2, 4); 
     laplacianEdge = edge(grayImage, 'log'); % 'log' 使用了拉普拉斯高斯算子
-    figure;
     imshow(laplacianEdge);
     title('拉普拉斯算子边缘提取');
-
 end
+
+
 
 function objectExtraction(hObject, eventdata)
     % 获取当前图形窗口句柄
@@ -482,7 +513,7 @@ function featureExtraction(hObject, eventdata)
     end
 
     calculateLBP(grayImageData);
-    calculateLBP
+    calculateHOG(grayImageData);
 
     %LBP特征提取
     function lbpImage = calculateLBP(grayImage)
@@ -501,14 +532,60 @@ function featureExtraction(hObject, eventdata)
             end
         end
         lbp=uint8(lbp);
-        figure,imshow(lbp),title('LBP特征图');
+        figure('Name', 'LBP特征图', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+        imshow(lbp);
+        title('LBP特征图');
         subim=lbp(1:8,1:8);
-        figure,imhist(subim),title('第一个8*8子区域的LBP直方图');
+        figure('Name', 'LBP直方图', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+        imhist(subim);
+        title('第一个8*8子区域的LBP直方图');
         end
 
     %HOG特征提取
-    function hogImage = calculateHOG(grayImage)
-        
+    function hogFeatures = calculateHOG(grayImage)
+    % 计算图像的梯度
+    [Gx, Gy] = imgradientxy(grayImage);
+    % 计算梯度的幅度和方向
+    GradientMag = sqrt(Gx.^2 + Gy.^2);
+    GradientAngle = atan2(Gy, Gx) * (180/pi); % 将弧度转换为度
+
+    % 将角度限制在0到180度之间
+    GradientAngle(GradientAngle < 0) = GradientAngle(GradientAngle < 0) + 180;
+    
+    % 设置HOG参数
+    cellSize = [8 8]; % 单元格大小
+    blockSize = [16 16]; % 块大小（包含多个单元格）
+    bins = 9; % 直方图的方向数量
+
+    % 初始化HOG特征
+    hogFeatures = zeros(floor(size(grayImage, 1)/cellSize(1)), floor(size(grayImage, 2)/cellSize(2)), bins);
+
+    % 计算每个单元格的直方图
+    for y = 1:cellSize(1):size(grayImage, 1)-cellSize(1)+1
+        for x = 1:cellSize(2):size(grayImage, 2)-cellSize(2)+1
+            cellMag = GradientMag(y:y+cellSize(1)-1, x:x+cellSize(2)-1);
+            cellAngle = GradientAngle(y:y+cellSize(1)-1, x:x+cellSize(2)-1);
+            cellHOG = zeros(1, bins);
+            for i = 1:cellSize(1)
+                for j = 1:cellSize(2)
+                    angleBin = floor(cellAngle(i, j) / 20) + 1; % 将角度映射到直方图的bin
+                    if angleBin == bins+1
+                        angleBin = 1; % 如果角度是180度，则将其映射到第一个bin
+                    end
+                    cellHOG(angleBin) = cellHOG(angleBin) + cellMag(i, j);
+                end
+            end
+            hogFeatures(floor((y-1)/cellSize(1)+1), floor((x-1)/cellSize(2)+1), :) = cellHOG;
+        end
+    end
+    
+    % 可视化HOG特征
+    figure('Name', 'HOG特征', 'NumberTitle', 'off', 'MenuBar', 'none', 'ToolBar', 'none');
+    for i = 1:size(hogFeatures, 3)
+        subplot(3, 3, i);
+        imshow(hogFeatures(:, :, i), []);
+        title(['HOG特征', num2str(i)]);
+    end
     end
 
 end
